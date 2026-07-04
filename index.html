@@ -5,7 +5,7 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Courier New',monospace;background:#fff;color:#111;padding:10px;font-size:13px;user-select:none}
 h2{font-size:15px;font-weight:600;margin-bottom:6px}
-canvas#c{display:block;border:1px solid #ccc;border-radius:6px}
+canvas#c{display:block;border:1px solid #ccc;border-radius:6px;cursor:crosshair}
 #panels{display:flex;gap:10px;align-items:flex-start}
 #right{width:225px;flex-shrink:0;font-size:12px}
 .stat-bar{display:flex;gap:8px;margin-bottom:3px;flex-wrap:wrap;align-items:center}
@@ -54,9 +54,10 @@ button.active-blue{background:#378ADD22;color:#378ADD;border-color:#378ADD;font-
       <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 &nbsp;·&nbsp; <kbd>Shift</kbd> 대쉬 (무적)</div>
       <div><kbd>Q</kbd> 붉은 마룡 &nbsp;·&nbsp; <kbd>E</kbd> 푸른 마룡</div>
       <div><kbd>스펠키</kbd> 입력 시작 → <b>시선 고정</b> + 시간 25% 감속</div>
+      <div>또는 <kbd>🖱️ 좌클릭 드래그</kbd>로 키패드 셀을 따라 입력</div>
       <div>입력 중 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>로 이동 가능 (시선은 고정 유지)</div>
-      <div><kbd>Enter</kbd> 또는 <kbd>마지막키 재입력</kbd> → 주문 발동</div>
-      <div><kbd>Esc</kbd> 또는 <kbd>첫키 재입력</kbd> (2키 이상) → 입력 취소</div>
+      <div><kbd>Enter</kbd>·<kbd>🖱️클릭 해제</kbd>·<kbd>마지막키 재입력</kbd> → 주문 발동</div>
+      <div><kbd>Esc</kbd>·<kbd>🖱️ 우클릭</kbd>·<kbd>첫키 재입력</kbd> (2키 이상) → 입력 취소</div>
       <div>같은 키 2번 연속 (<kbd>U</kbd><kbd>U</kbd>) → 점 공격 발동</div>
       <div>5키 이상 + 인식 실패 → 자동 취소</div>
       <div style="margin-top:3px;color:#888"><b>스펠키:</b> <kbd>Y</kbd><kbd>U</kbd><kbd>I</kbd><kbd>O</kbd><kbd>P</kbd> / <kbd>H</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd><kbd>;</kbd> / <kbd>N</kbd><kbd>M</kbd><kbd>,</kbd><kbd>.</kbd><kbd>/</kbd></div>
@@ -409,9 +410,15 @@ const pt=keyToWorld(k,S.inputMode?S.frozenFacing:S.facing,S.inputMode?S.frozenPx
 if(pt) spawnKeyDot(pt[0],pt[1],S.dragon);
 }});
 document.addEventListener("keyup",e=>{const k=e.key.toLowerCase();if(["w","a","s","d"].includes(k))S.moveKeys.delete(k);});
+let mouseInputActive=false,lastMouseKey=null;
+function screenToKey(sx,sy){const wx=sx/CS,wy=sy/CS,fac=S.inputMode?S.frozenFacing:S.facing,px=S.inputMode?S.frozenPx:S.px,py=S.inputMode?S.frozenPy:S.py;let best=null,bestDist=Infinity;ORIG_ROWS.forEach(({keys})=>keys.forEach(k=>{const pt=keyToWorld(k,fac,px,py);if(!pt)return;const d=Math.hypot(wx-pt[0],wy-pt[1]);if(d<0.7&&d<bestDist){bestDist=d;best=k;}}));return best;}
 function renderUI(){const now=Date.now();const dirs=["→","↘","↓","↙","←","↖","↑","↗"];const dispFacing=S.inputMode?S.frozenFacing:S.facing;const di=Math.round(((dispFacing%(Math.PI*2)+Math.PI*2)%(Math.PI*2))/(Math.PI/4))%8;document.getElementById("statbar").innerHTML=`<span class="badge ${S.dragon==="red"?"red":""}">🔴 ${Math.round(S.hp.red)}/${S.maxhp.red}</span><span class="badge ${S.dragon==="blue"?"blue":""}">🔵 ${Math.round(S.hp.blue)}/${S.maxhp.blue}</span>${S.slowTime?'<span class="badge warn">⏳ 시선고정</span>':""}${S.dashing?'<span class="badge green">💨</span>':""}${S.playerSlow>0?'<span class="badge warn">🐢</span>':""}  <span style="color:#888;font-size:10px">시선${dirs[di]}</span>`;document.getElementById("btn-red").className=S.dragon==="red"?"active-red":"";document.getElementById("btn-blue").className=S.dragon==="blue"?"active-blue":"";document.getElementById("feedback-area").innerHTML=S.feedback?`<div class="feedback ${S.feedback.ok?"ok":"err"}">${S.feedback.text}</div>`:"";document.getElementById("cd-bar").innerHTML=CD_DEFS.map(({key,label,color,maxMs})=>{const cd=S.cooldowns[key]||0,rem=Math.max(0,cd-now),pct=rem>0?rem/maxMs*100:0,on=rem>0;return `<div class="cd-pill" style="color:${on?color:"#aaa"};border-color:${on?color+"88":"#ddd"}"><div class="cd-fill" style="width:${pct}%;background:${color}"></div><span>${label}${on?" "+(rem/1000).toFixed(1):""}</span></div>`;}).join("");const sb=document.getElementById("spawn-btns");if(!sb._built){sb._built=true;sb.innerHTML=["boar","spider","spirit","slime","antling","bomb"].map(id=>{const d=mkMonster(id,0,0);return d?`<button onclick="spawnMonster('${id}')">${d.emoji} ${d.name}</button>`:""}).join("");}document.getElementById("kpad-label").textContent=S.inputMode?"📝 "+S.seq.join("").toUpperCase()+(S.recShape?" → "+S.recShape:""):"키패드";document.getElementById("kpad").innerHTML=ORIG_ROWS.map(({layer,keys})=>keys.map(k=>{const lc=LAYER_COLOR[layer],isLast=S.inputMode&&S.seq.length&&S.seq[S.seq.length-1]===k,inSeq=S.inputMode&&S.seq.includes(k);let cls="kbtn";if(isLast)cls+=S.dragon==="red"?" last-red":" last-blue";else if(inSeq)cls+=S.dragon==="red"?" seq-red":" seq";return `<div class="${cls}" style="${!isLast&&!inSeq?`border-top:2px solid ${lc}88`:""}" onclick="clickKey('${k}')">${k.toUpperCase()}</div>`;}).join("")).join("");const ml=document.getElementById("monster-list");const alive=S.monsters.filter(m=>m.curhp>0);if(!alive.length)ml.innerHTML='<div style="color:#aaa;font-size:10px">소환된 몬스터 없음</div>';else ml.innerHTML=alive.map(m=>{const pct=m.curhp/m.hp*100,st=m.captured>0?"<span style='color:#378ADD;font-size:9px'>봉인</span>":m.stunned>0?"<span style='color:#EF9F27;font-size:9px'>기절</span>":m.slowed>0?"<span style='color:#888;font-size:9px'>슬</span>":m.aiState==="charge"?"<span style='color:#C0392B;font-size:9px'>돌진</span>":m.aiState==="ready"?"<span style='color:#E67E22;font-size:9px'>준비</span>":"";return `<div class="monster-row"><div style="width:6px;height:6px;border-radius:50%;background:${m.color};flex-shrink:0"></div><span style="min-width:44px;font-size:10px">${m.name}</span><div class="hp-bar"><div class="hp-fill" style="width:${pct}%;background:${pct>50?"#5a9e20":"#E24B4A"}"></div></div><span style="min-width:26px;color:#888;font-size:9px">${Math.round(m.curhp)}/${m.hp}</span>${st}</div>`;}).join("");const lg=document.getElementById("log");lg.innerHTML=S.log.map(l=>`<div>${l}</div>`).join("");lg.scrollTop=lg.scrollHeight;}
 const cvs=document.getElementById("c"),ctx=cvs.getContext("2d");
 if(!CanvasRenderingContext2D.prototype.roundRect){CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){r=Math.min(r,w/2,h/2);this.beginPath();this.moveTo(x+r,y);this.lineTo(x+w-r,y);this.arcTo(x+w,y,x+w,y+r,r);this.lineTo(x+w,y+h-r);this.arcTo(x+w,y+h,x+w-r,y+h,r);this.lineTo(x+r,y+h);this.arcTo(x,y+h,x,y+h-r,r);this.lineTo(x,y+r);this.arcTo(x,y,x+r,y,r);this.closePath();return this;};}
+cvs.addEventListener("mousedown",e=>{if(e.button!==0)return;const r=cvs.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top,key=screenToKey(sx,sy);if(!key)return;e.preventDefault();if(!S.inputMode){startInput(key);lastMouseKey=key;mouseInputActive=true;const pt=keyToWorld(key,S.frozenFacing,S.frozenPx,S.frozenPy);if(pt)spawnKeyDot(pt[0],pt[1],S.dragon);}else{clickKey(key);lastMouseKey=key;}});
+cvs.addEventListener("mousemove",e=>{if(!mouseInputActive||!S.inputMode)return;const r=cvs.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top,key=screenToKey(sx,sy);if(key&&key!==lastMouseKey){lastMouseKey=key;clickKey(key);}else if(!key)lastMouseKey=null;});
+cvs.addEventListener("mouseup",e=>{if(e.button!==0)return;if(mouseInputActive&&S.inputMode&&S.seq.length>=1)fireSpell();mouseInputActive=false;});
+cvs.addEventListener("contextmenu",e=>{e.preventDefault();if(S.inputMode)cancelInput();mouseInputActive=false;});
 // 수정 ===== 이펙트 스프라이트 데이터 =====
 const EFFECT_DATA = (function(){
   const d = {};
