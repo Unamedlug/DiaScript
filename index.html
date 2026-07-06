@@ -361,7 +361,7 @@ function applyMonsterInteraction(m,shape,drg,keyPts,apex){
   if(m.id==="spirit"&&shape==="V"&&drg==="red"){for(let a=0;a<3;a++){const ang=Math.atan2(S.py-m.y,S.px-m.x)+(a-1)*0.4;spawnProj(m.x,m.y,m.x+Math.cos(ang)*10,m.y+Math.sin(ang)*10,m.projSpd,m.atk*1.5,m.uid);}addLog("👻 3발!");}
   if(m.id==="spirit"&&shape==="O"&&drg==="blue"){S.projectiles=S.projectiles.filter(p=>p.ownerUid!==m.uid);addLog("👻 탄환 봉인!");}
   if(m.id==="slime"&&shape==="O"&&drg==="red"&&!m.splitDone){m.splitDone=true;m.splitPhase=1;m.splitTimer=Date.now()+1500;m._splitCount=4;m._splitStart=Date.now();}
-  if(m.id==="slime"&&shape==="O"&&drg==="blue"){m._noSplit=true;m.captured=Math.max(m.captured,5000);}
+  if(m.id==="slime"&&shape==="O"&&drg==="blue"){m._noSplit=true;m.captured=Math.max(m.captured,Math.max(eo.stun*1000,eo.expires-now+5000));}
   if(m.id==="slime"&&shape==="X"&&m.splitPhase===1){m.splitPhase=0;m.splitDone=true;m.curhp=0;addLog("🟢 분열 취소!");}
   if(m.id==="antling"&&!m.separated&&shape==="generic")separateAntling(m,"I");
   if(m.id==="antling"&&!m.separated&&shape==="X")separateAntling(m,drg==="red"?"X_red":"X_blue");
